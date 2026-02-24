@@ -306,15 +306,20 @@ export default function App() {
 
     // Fetch health status
     fetch('/api/health')
-      .then(res => {
+      .then(async res => {
         const contentType = res.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
+        if (res.ok && contentType && contentType.includes("application/json")) {
           return res.json();
         }
-        throw new Error("Invalid response from health check");
+        const text = await res.text();
+        console.error("Health check failed with status:", res.status, "Response:", text.slice(0, 100));
+        throw new Error(`Health check failed: ${res.status} ${res.statusText}`);
       })
       .then(data => setHealth(data))
-      .catch(err => console.error("Health check failed", err));
+      .catch(err => {
+        console.error("Health check error:", err);
+        // Don't set error state here to avoid blocking the whole UI if just health check fails
+      });
 
     return () => window.removeEventListener('message', handleMessage);
   }, []);
