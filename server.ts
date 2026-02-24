@@ -9,6 +9,9 @@ import admin from "firebase-admin";
 
 dotenv.config();
 
+const app = express();
+const PORT = 3000;
+
 // Lazy Firebase Admin Initialization
 let firebaseAdmin: admin.app.App | null = null;
 
@@ -90,17 +93,13 @@ db.exec(`
   );
 `);
 
-async function startServer() {
-  const app = express();
-  const PORT = 3000;
+// Initialize Firebase Admin
+getFirebaseAdmin();
 
-  // Initialize Firebase Admin
-  getFirebaseAdmin();
+app.use(express.json({ limit: '50mb' }));
 
-  app.use(express.json({ limit: '50mb' }));
-
-  // Auth Routes (Real Google OAuth)
-  app.get("/api/auth/google/url", (req, res) => {
+// Auth Routes (Real Google OAuth)
+app.get("/api/auth/google/url", (req, res) => {
     const rootUrl = "https://accounts.google.com/o/oauth2/v2/auth";
     
     const appUrl = process.env.APP_URL?.replace(/\/$/, "");
@@ -434,11 +433,12 @@ Perform full intelligence analysis and return the results in the specified JSON 
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
+    createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
+    }).then(vite => {
+      app.use(vite.middlewares);
     });
-    app.use(vite.middlewares);
   } else {
     app.use(express.static("dist"));
     app.get("*", (req, res) => {
@@ -446,9 +446,11 @@ Perform full intelligence analysis and return the results in the specified JSON 
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
-}
+  // Only listen if not on Vercel
+  if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  }
 
-startServer();
+export default app;
