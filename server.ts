@@ -1,5 +1,4 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import Database from "better-sqlite3";
@@ -11,6 +10,10 @@ dotenv.config();
 
 const app = express();
 const PORT = 3000;
+
+// Database initialization
+const dbPath = process.env.VERCEL ? path.join("/tmp", "intelligence.db") : "intelligence.db";
+const db = new Database(dbPath);
 
 // Lazy Firebase Admin Initialization
 let firebaseAdmin: admin.app.App | null = null;
@@ -41,8 +44,6 @@ function getFirebaseAdmin() {
   }
   return firebaseAdmin;
 }
-
-const db = new Database("intelligence.db");
 
 // Helper for exponential backoff
 async function withRetry<T>(fn: () => Promise<T>, maxRetries = 5, baseDelay = 2000): Promise<T> {
@@ -433,16 +434,19 @@ Perform full intelligence analysis and return the results in the specified JSON 
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
-    createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    }).then(vite => {
-      app.use(vite.middlewares);
+    import("vite").then(({ createServer: createViteServer }) => {
+      createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      }).then(vite => {
+        app.use(vite.middlewares);
+      });
     });
   } else {
-    app.use(express.static("dist"));
+    const distPath = path.resolve(process.cwd(), "dist");
+    app.use(express.static(distPath));
     app.get("*", (req, res) => {
-      res.sendFile(path.resolve("dist", "index.html"));
+      res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
